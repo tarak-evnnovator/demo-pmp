@@ -5,7 +5,7 @@ import type { DataRow, PortalRole } from "../../api/types";
 import { DataTable } from "../../components/data/DataTable";
 import { ErrorState, Field, LoadingState, PageHeader } from "../../components/ui";
 
-const roles: PortalRole[] = ["TENANT_ADMIN", "OPERATOR", "DEVELOPER", "FINANCE_VIEWER"];
+const roles: PortalRole[] = ["TENANT_ADMIN", "OPERATOR", "FINANCE_VIEWER"];
 export function TeamPage() {
   const [rows, setRows] = useState<DataRow[]>([]); const [email, setEmail] = useState(""); const [role, setRole] = useState<PortalRole>("OPERATOR"); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [message, setMessage] = useState("");
   const load = useCallback(() => { setLoading(true); api<DataRow[]>("/cpo/v1/team").then(setRows).catch(e => setError(e.message)).finally(() => setLoading(false)); }, []);

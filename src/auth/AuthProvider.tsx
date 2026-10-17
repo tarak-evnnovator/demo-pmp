@@ -1,43 +1,69 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { api } from "../api/client";
-import type { PartnerActor } from "../api/types";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { api } from "@/api/client";
+import type { Actor } from "@/api/types";
 
-interface AuthState {
-  actor: PartnerActor | null;
+const AuthContext = createContext<{
+  actor: Actor | null;
   loading: boolean;
-  login(email: string, password: string): Promise<void>;
-  logout(): Promise<void>;
-  refresh(): Promise<void>;
-  can(permission: string): boolean;
-}
-
-const AuthContext = createContext<AuthState | null>(null);
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [actor, setActor] = useState<PartnerActor | null>(null);
+  refresh: () => Promise<void>;
+  login: (email: string, password: string, environment?: "stage" | "production") => Promise<void>;
+  logout: () => Promise<void>;
+  can: (permission: string) => boolean;
+  base: string;
+} | null>(null);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [actor, setActor] = useState<Actor | null>(null);
   const [loading, setLoading] = useState(true);
-  const refresh = useCallback(async () => {
-    try { setActor(await api<PartnerActor>("/portal/v1/auth/me")); }
-    catch { setActor(null); }
-    finally { setLoading(false); }
+  async function refresh() {
+    try {
+      setActor(await api<Actor>("/portal/v1/auth/me"));
+    } catch {
+      setActor(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    void refresh();
+    const expired = () => setActor(null);
+    window.addEventListener("session-expired", expired);
+    return () => window.removeEventListener("session-expired", expired);
   }, []);
-  useEffect(() => { void refresh(); }, [refresh]);
-  const value = useMemo<AuthState>(() => ({
-    actor, loading,
-    async login(email, password) {
-      await api("/portal/v1/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
-      await refresh();
-    },
-    async logout() { await api("/portal/v1/auth/logout", { method: "POST" }); setActor(null); },
-    refresh,
-    can: (permission) => actor?.permissions.includes(permission) ?? false,
-  }), [actor, loading, refresh]);
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  async function login(email: string, password: string, environment: "stage" | "production" = "stage") {
+    await api(`/portal/v1/auth/login?environment=${environment}`, {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    await refresh();
+  }
+  async function logout() {
+    await api("/portal/v1/auth/logout", { method: "POST" });
+    setActor(null);
+  }
+  return (
+    <AuthContext.Provider
+      value={{
+        actor,
+        loading,
+        refresh,
+        login,
+        logout,
+        can: (permission) => Boolean(actor?.permissions.includes(permission)),
+        base: actor?.partyRole === "CPO" ? "/cpo/v1" : "/partner/v1",
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
-
-export function useAuth(): AuthState {
+export function useAuth() {
   const value = useContext(AuthContext);
-  if (!value) throw new Error("useAuth must be used within AuthProvider");
+  if (!value) throw new Error("AuthProvider is missing");
   return value;
 }
-

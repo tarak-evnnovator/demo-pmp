@@ -1,24 +1,21 @@
-import { mockRequest } from "../demo/mock";
-
+import { mockRequest } from "@/demo/mock";
 export class ApiError extends Error {
-  status: number;
-  code: string;
-  constructor(status: number, code: string, message: string) {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
     super(message);
-    this.status = status;
-    this.code = code;
   }
 }
-
-export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const method = (options.method ?? "GET").toUpperCase();
-  try { return mockRequest(path, method, typeof options.body === "string" ? options.body : undefined) as T; }
-  catch (error) { throw new ApiError(400, "DEMO_ONLY", error instanceof Error ? error.message : "Demo request failed"); }
+export async function api<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  return await mockRequest(path, options) as T;
 }
-
-export function qs(values: Record<string, string | number | undefined>): string {
-  const params = new URLSearchParams();
-  Object.entries(values).forEach(([key, value]) => value !== undefined && value !== "" && params.set(key, String(value)));
-  const query = params.toString();
-  return query ? `?${query}` : "";
+export function qs(values: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(values))
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  return query.size ? `?${query}` : "";
 }
